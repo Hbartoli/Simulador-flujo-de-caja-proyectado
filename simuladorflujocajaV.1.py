@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import io  # Requerido para procesar el archivo Excel en memoria web
+import io
 
 # Configuración de la página
-st.set_page_config(page_title="Simulador de Flujo de Caja", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Simulador de Flujo de Caja Proporcionado", layout="wide", page_icon="📊")
 
-st.title("📊 Simulador de Flujo de Caja Proyectado")
-st.markdown("Predecí el comportamiento de tu efectivo y descubrí la fecha límite de tu negocio (Runway).")
+st.title("📊 Simulador Avanzado de Flujo de Caja Proyectado")
+st.markdown("Predecí el comportamiento de tu efectivo, desglosá tus gastos y evaluá la salud mensual de tu negocio.")
 
 # --- BARRA LATERAL: ENTRADA DE DATOS ---
 st.sidebar.header("⚙️ Parámetros Iniciales")
@@ -18,23 +18,27 @@ efectivo_inicial = st.sidebar.number_input(
     "Efectivo Inicial Disponible ($)", 
     min_value=0.0, 
     value=50000.0, 
-    step=1000.0
+    step=5000.0
 )
 
 dias_proyeccion = st.sidebar.slider(
     "Días a Proyectar", 
-    min_value=30, 
+    min_value=60, 
     max_value=365, 
     value=180, 
     step=30
 )
 
 st.sidebar.header("📈 Ingresos Diarios Promedio")
-ingresos_fijos = st.sidebar.number_input("Ventas / Ingresos Recurrentes ($)", min_value=0.0, value=1500.0)
+ingresos_fijos = st.sidebar.number_input("Ventas / Ingresos Recurrentes ($)", min_value=0.0, value=2500.0)
 
-st.sidebar.header("📉 Egresos Diarios Promedio")
-costos_fijos = st.sidebar.number_input("Costos Fijos (Renta, Salarios, etc.) ($)", min_value=0.0, value=800.0)
-costos_variables = st.sidebar.number_input("Costos Variables (Proveedores, Marketing) ($)", min_value=0.0, value=400.0)
+# --- DESGLOSE DE GASTOS ---
+st.sidebar.header("📉 Egresos Diarios por Categoría")
+g_salarios = st.sidebar.number_input("🧑‍💻 Salarios y Nómina ($)", min_value=0.0, value=800.0)
+g_marketing = st.sidebar.number_input("📣 Marketing y Pauta ($)", min_value=0.0, value=400.0)
+g_software = st.sidebar.number_input("💻 Software y SaaS ($)", min_value=0.0, value=150.0)
+g_proveedores = st.sidebar.number_input("📦 Proveedores y Stock ($)", min_value=0.0, value=500.0)
+g_alquiler = st.sidebar.number_input("🏢 Alquiler y Servicios ($)", min_value=0.0, value=250.0)
 
 st.sidebar.header("🔮 Escenario de Estrés")
 factor_ingresos = st.sidebar.slider("Optimismo de Ventas (%)", min_value=0, max_value=200, value=100) / 100.0
@@ -44,12 +48,21 @@ factor_gastos = st.sidebar.slider("Incremento de Gastos (%)", min_value=100, max
 fecha_inicio = datetime.today()
 fechas = [fecha_inicio + timedelta(days=i) for i in range(dias_proyeccion)]
 
-# Aplicar factores de escenario
+# Aplicar escenarios a las variables calculadas
 ingresos_reales = ingresos_fijos * factor_ingresos
-egresos_reales = (costos_fijos + costos_variables) * factor_gastos
-flujo_neto_diario = ingresos_reales - egresos_reales
 
-# Generar series de datos
+# Gastos individuales con factor de estrés
+gastos_dict = {
+    "Salarios": g_salarios * factor_gastos,
+    "Marketing": g_marketing * factor_gastos,
+    "Software/SaaS": g_software * factor_gastos,
+    "Proveedores": g_proveedores * factor_gastos,
+    "Alquiler/Servicios": g_alquiler * factor_gastos
+}
+egresos_totales_reales = sum(gastos_dict.values())
+flujo_neto_diario = ingresos_reales - egresos_totales_reales
+
+# Generar series temporales diárias
 saldos = []
 saldo_actual = efectivo_inicial
 fecha_quiebra = None
@@ -64,14 +77,17 @@ for i in range(dias_proyeccion):
         
     saldos.append(saldo_actual)
 
-# Crear DataFrame limpio para procesamiento
-df = pd.DataFrame({
+# Crear DataFrame base diario
+df_diario = pd.DataFrame({
     "Fecha": fechas,
+    "Ingresos": [ingresos_reales] * dias_proyeccion,
+    "Egresos Totales": [egresos_totales_reales] * dias_proyeccion,
     "Saldo Efectivo": saldos
 })
 
-# Formatear la columna fecha para que se vea limpia en el Excel y la app
-df["Fecha"] = df["Fecha"].dt.strftime('%Y-%m-%d')
+# Añadir las columnas de gastos individuales para la exportación de datos completa
+for cat, valor in gastos_dict.items():
+    df_diario[f"Gasto: {cat}"] = valor
 
 # --- SECCIÓN DE MÉTRICAS CLAVE ---
 col1, col2, col3 = st.columns(3)
@@ -97,59 +113,87 @@ with col3:
 
 st.markdown("---")
 
-# --- GRÁFICO INTERACTIVO ---
-st.subheader("📈 Proyección Evolutiva del Efectivo")
+# --- GRÁFICOS (DISTRIBUCIÓN EN 2 COLUMNAS) ---
+col_graf1, col_graf2 = st.columns(2)
 
-fig = go.Figure()
+with col_graf1:
+    st.subheader("📈 Evolución Diaria del Efectivo")
+    fig_linea = go.Figure()
+    
+    fig_linea.add_trace(go.Scatter(
+        x=df_diario["Fecha"], 
+        y=df_diario["Saldo Efectivo"], 
+        mode='lines',
+        name='Saldo en Caja',
+        line=dict(color='#2ca02c' if flujo_neto_diario >= 0 else '#d62728', width=3),
+        fill='tozeroy'
+    ))
+    
+    fig_linea.add_trace(go.Scatter(
+        x=df_diario["Fecha"],
+        y=[0] * len(df_diario),
+        mode='lines',
+        name='Límite Crítico ($0)',
+        line=dict(color='black', width=1, dash='dash')
+    ))
+    
+    fig_linea.update_layout(xaxis_title="Fecha", yaxis_title="Efectivo ($)", template="plotly_white", hovermode="x unified", margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig_linea, use_container_width=True)
 
-fig.add_trace(go.Scatter(
-    x=df["Fecha"], 
-    y=df["Saldo Efectivo"], 
-    mode='lines',
-    name='Saldo de Caja',
-    line=dict(color='#2ca02c' if flujo_neto_diario >= 0 else '#d62728', width=3),
-    fill='tozeroy'
-))
+with col_graf2:
+    st.subheader("📊 Comparativa Mensual Consolidada")
+    
+    # Procesamiento para agrupar datos por Mes
+    df_mensual = df_diario.copy()
+    df_mensual["Mes"] = df_mensual["Fecha"].dt.strftime('%b %Y')
+    
+    # Agrupamos sumando ingresos y egresos, y tomando el último saldo del mes
+    df_mes_agrupado = df_mensual.groupby("Mes", sort=False).agg({
+        "Ingresos": "sum",
+        "Egresos Totales": "sum"
+    }).reset_index()
+    
+    fig_barra = go.Figure()
+    fig_barra.add_trace(go.Bar(
+        x=df_mes_agrupado["Mes"],
+        y=df_mes_agrupado["Ingresos"],
+        name="Ingresos Totales",
+        marker_color='#1f77b4'
+    ))
+    fig_barra.add_trace(go.Bar(
+        x=df_mes_agrupado["Mes"],
+        y=df_mes_agrupado["Egresos Totales"],
+        name="Gastos Totales",
+        marker_color='#ff7f0e'
+    ))
+    
+    fig_barra.update_layout(barmode='group', xaxis_title="Mes", yaxis_title="Monto ($)", template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig_barra, use_container_width=True)
 
-fig.add_trace(go.Scatter(
-    x=df["Fecha"],
-    y=[0] * len(df),
-    mode='lines',
-    name='Límite Crítico ($0)',
-    line=dict(color='black', width=1, dash='dash')
-))
-
-fig.update_layout(
-    xaxis_title="Fecha",
-    yaxis_title="Efectivo Disponible ($)",
-    hovermode="x unified",
-    template="plotly_white",
-    height=500,
-    margin=dict(l=20, r=20, t=20, b=20)
-)
-
-st.plotly_chart(fig, use_container_width=True)
+st.markdown("---")
 
 # --- DETALLE DE DATOS Y EXPORTACIÓN ---
-with st.expander("👀 Ver tabla de datos proyectados y descargar"):
-    # Mostrar la tabla formateada en la interfaz
-    st.dataframe(df.style.format({"Saldo Efectivo": "${:,.2f}"}))
+with st.expander("👀 Ver matriz detallada de datos y descargar"):
     
-    # Función interna para convertir el DataFrame a binario Excel
+    # Formateamos las fechas de cara al usuario y el excel
+    df_exportar = df_diario.copy()
+    df_exportar["Fecha"] = df_exportar["Fecha"].dt.strftime('%Y-%m-%d')
+    
+    st.dataframe(df_exportar.style.format({col: "${:,.2f}" for col in df_exportar.columns if col != "Fecha"}))
+    
     def convertir_a_excel(dataframe):
         output = io.BytesIO()
-        # Usamos openpyxl como motor de escritura
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            dataframe.to_excel(writer, index=False, sheet_name='Proyección de Caja')
+            dataframe.to_excel(writer, index=False, sheet_name='Flujo Diario Avanzado')
+            # También incluimos el resumen mensual en otra pestaña del Excel
+            df_mes_agrupado.to_excel(writer, index=False, sheet_name='Resumen Mensual')
         return output.getvalue()
 
-    # Generar los bytes del archivo Excel
-    excel_data = convertir_a_excel(df)
+    excel_data = convertir_a_excel(df_exportar)
 
-    # Botón nativo de Streamlit para descargar
     st.download_button(
-        label="📥 Descargar Proyección en Excel (.xlsx)",
+        label="📥 Descargar Reporte Financiero Completo en Excel (.xlsx)",
         data=excel_data,
-        file_name=f"proyeccion_flujo_caja_{datetime.today().strftime('%Y%m%d')}.xlsx",
+        file_name=f"reporte_cashflow_avanzado_{datetime.today().strftime('%Y%m%d')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
