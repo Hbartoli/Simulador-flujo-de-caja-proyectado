@@ -100,21 +100,21 @@ fechas_lista, ingresos_lista, egresos_lista, saldos_lista, gasto_extra_lista, no
 saldo_actual = efectivo_inicial
 fecha_quiebra = None
 
-# Procesar la tabla de gastos extraordinarios del usuario en un diccionario indexado por el número de día
+# Procesar la tabla de gastos extraordinarios limpiando valores nulos antes del bucle diario
 dict_gastos_por_dia = {}
 if df_extras_usuario is not None and not df_extras_usuario.empty:
-    for _, fila in df_extras_usuario.iterrows():
+    for _, fila in df_extras_usuario.dropna(subset=["Día de Impacto (1 al 365)", "Monto ($)"]).iterrows():
         try:
             dia_num = int(fila["Día de Impacto (1 al 365)"])
             monto_ex = float(fila["Monto ($)"])
-            concepto_ex = str(fila["Concepto"])
+            concepto_ex = str(fila["Concepto"]) if not pd.isna(fila["Concepto"]) else "Gasto Extra"
             if dia_num in dict_gastos_por_dia:
                 dict_gastos_por_dia[dia_num]["monto"] += monto_ex
                 dict_gastos_por_dia[dia_num]["concepto"] += f", {concepto_ex}"
             else:
                 dict_gastos_por_dia[dia_num] = {"monto": monto_ex, "concepto": concepto_ex}
-        except:
-            pass # Prevenir errores si el usuario deja filas incompletas en la tabla
+        except (ValueError, TypeError):
+            pass
 
 # Simulación iterativa día por día
 for i in range(dias_proyeccion):
