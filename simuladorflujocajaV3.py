@@ -77,8 +77,17 @@ with col_config2:
         {"Concepto": "Renovación Licencias", "Monto ($)": 5000.0, "Día de Impacto (1 al 365)": 90}
     ])
     
-    # Editor interactivo de datos nativo de Streamlit
-    df_extras_usuario = st.data_editor(df_extras_plantilla, num_rows="dynamic", key="tabla_gastos_extra")
+    # Editor interactivo configurado profesionalmente para evitar celdas vacías (None)
+    df_extras_usuario = st.data_editor(
+        df_extras_plantilla, 
+        num_rows="dynamic", 
+        key="tabla_gastos_extra",
+        column_config={
+            "Concepto": st.column_config.TextColumn("Concepto", default="Gasto Extra", required=True),
+            "Monto ($)": st.column_config.NumberColumn("Monto ($)", default=0.0, min_value=0.0, required=True),
+            "Día de Impacto (1 al 365)": st.column_config.NumberColumn("Día de Impacto", default=1, min_value=1, max_value=365, required=True)
+        }
+    )
 
 # --- CÁLCULOS CRONOLÓGICOS DEL FLUJO DE CAJA ---
 gastos_operativos_dict = {
