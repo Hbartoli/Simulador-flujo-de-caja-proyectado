@@ -215,27 +215,22 @@ st.subheader("🍰 Distribución de Costos Fijos Recurrentes (Estructura Base)")
 col_torta, col_info_torta = st.columns(2)
 
 with col_torta:
-    df_torta = pd.DataFrame({
-"Categoría": list(gastos_operativos_dict.keys()),
-      "Costo Diario": list(gastos_operativos_dict.values())})
-  fig_torta = px.pie(df_torta, values='Costo Diario', names='Categoría', 
-                     hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-fig_torta.update_traces(textposition='inside', textinfo='percent+label')
-fig_torta.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=True)
-st.plotly_chart(fig_torta, use_container_width=True)
+    df_torta = pd.DataFrame({"Categoría": list(gastos_operativos_dict.keys()), "Costo Diario": list(gastos_operativos_dict.values())})
+    # Línea unificada en una sola línea para evitar errores de sangría
+    fig_torta = px.pie(df_torta, values='Costo Diario', names='Categoría', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+    fig_torta.update_traces(textposition='inside', textinfo='percent+label')
+    fig_torta.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=True)
+    st.plotly_chart(fig_torta, use_container_width=True)
 
 with col_info_torta:
-  st.markdown("#### 💡 Análisis de Crecimiento vs Estructura")
-  categoria_max = max(gastos_operativos_dict, 
-                      key=gastos_operativos_dict.get)
-  st.info(f"Tu principal centro de costo operativo base es 
-  {categoria_max}.")st.markdown("""
-  Al incorporar un crecimiento compuesto, vas a notar cómo el gráfico de barras mensual empieza a mostrar barras azules más altas con el paso del tiempo.
-
-  Si tu curva de efectivo cae bruscamente en un punto medio y luego se estabiliza, se debe al impacto directo del Gasto Extraordinario programado en la barra lateral.
-  """)
-  
-  st.markdown("---")
+    st.markdown("#### 💡 Análisis de Crecimiento vs Estructura")
+    categoria_max = max(gastos_operativos_dict, key=gastos_operativos_dict.get)
+    st.info(f"Tu principal centro de costo operativo base es **{categoria_max}**.")
+    st.markdown("""
+    Al incorporar un **crecimiento compuesto**, vas a notar cómo el gráfico de barras mensual empieza a mostrar barras azules más altas con el paso del tiempo. 
+    
+    Si tu curva de efectivo cae bruscamente en un punto medio y luego se estabiliza, se debe al impacto directo del **Gasto Extraordinario** programado en la barra lateral.
+    """)
 
 # --- DETALLE DE DATOS Y EXPORTACIÓN ---
 with st.expander("👀 Ver matriz detallada de datos y descargar"):
