@@ -228,24 +228,21 @@ with col_info_torta:
 st.markdown("---")
 
 # --- DETALLE DE DATOS Y EXPORTACIÓN ---
-
 with st.expander("👀 Ver matriz detallada de datos y descargar"):
     df_exportar = df_diario.copy()
     df_exportar["Fecha"] = df_exportar["Fecha"].dt.strftime('%Y-%m-%d')
-    st.dataframe(df_exportar.style.format({col: "${:,.2f}" for col in 
-                                           df_exportar.columns if col not in ["Fecha", "Detalle Gasto Extra"]}))
-
-def convertir_a_excel(dataframe):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        dataframe.to_excel(writer, index=False, sheet_name='Flujo Dinámico Diario')
-        df_mes_agrupado.to_excel(writer, index=False, sheet_name='Resumen Mensual Compuesto')
+    st.dataframe(df_exportar.style.format({col: "${:,.2f}" for col in df_exportar.columns if col not in ["Fecha", "Detalle Gasto Extra"]}))
+    
+    # Función interna de empaquetado Excel en memoria
+    def convertir_a_excel(dataframe):
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            dataframe.to_excel(writer, index=False, sheet_name='Flujo Dinámico Diario')
+            df_mes_agrupado.to_excel(writer, index=False, sheet_name='Resumen Mensual Compuesto')
         return output.getvalue()
 
-excel_data = convertir_a_excel(df_exportar)
-st.download_button
-(label="📥 Descargar Reporte Financiero Completo en Excel (.xlsx)",
-data=excel_data,
-file_name=f"cashflow_estacionalidad_{datetime.today().strftime('%Y%m%d')}.xlsx",
-mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    excel_data = convertir_a_excel(df_exportar)
+    nombre_archivo = f"cashflow_estacionalidad_{datetime.today().strftime('%Y%m%d')}.xlsx"
+
+    # Botón en una sola línea continua para evitar errores de sintaxis
+    st.download_button(label="📥 Descargar Reporte Financiero Completo en Excel (.xlsx)", data=excel_data, file_name=nombre_archivo, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
