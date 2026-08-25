@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import io  # Requerido para procesar el archivo Excel en memoria web
 
 # Configuración de la página
 st.set_page_config(page_title="Simulador de Flujo de Caja", layout="wide", page_icon="📊")
@@ -55,20 +56,22 @@ fecha_quiebra = None
 
 for i in range(dias_proyeccion):
     saldo_actual += flujo_neto_diario
-    # Evitar saldos negativos en el histórico simulado para detectar el quiebre
     if saldo_actual <= 0 and fecha_quiebra is None:
         fecha_quiebra = fechas[i]
-        saldo_actual = 0  # Se quedó sin caja
+        saldo_actual = 0  
     elif saldo_actual < 0:
         saldo_actual = 0
         
     saldos.append(saldo_actual)
 
-# Crear DataFrame
+# Crear DataFrame limpio para procesamiento
 df = pd.DataFrame({
     "Fecha": fechas,
     "Saldo Efectivo": saldos
 })
+
+# Formatear la columna fecha para que se vea limpia en el Excel y la app
+df["Fecha"] = df["Fecha"].dt.strftime('%Y-%m-%d')
 
 # --- SECCIÓN DE MÉTRICAS CLAVE ---
 col1, col2, col3 = st.columns(3)
@@ -99,7 +102,6 @@ st.subheader("📈 Proyección Evolutiva del Efectivo")
 
 fig = go.Figure()
 
-# Línea de flujo de caja
 fig.add_trace(go.Scatter(
     x=df["Fecha"], 
     y=df["Saldo Efectivo"], 
@@ -109,7 +111,6 @@ fig.add_trace(go.Scatter(
     fill='tozeroy'
 ))
 
-# Línea de peligro (Cero pesos)
 fig.add_trace(go.Scatter(
     x=df["Fecha"],
     y=[0] * len(df),
@@ -118,7 +119,6 @@ fig.add_trace(go.Scatter(
     line=dict(color='black', width=1, dash='dash')
 ))
 
-# Configuración de diseño del gráfico
 fig.update_layout(
     xaxis_title="Fecha",
     yaxis_title="Efectivo Disponible ($)",
@@ -130,6 +130,26 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- DETALLE DE DATOS ---
-with st.expander("👀 Ver tabla de datos proyectados día por día"):
+# --- DETALLE DE DATOS Y EXPORTACIÓN ---
+with st.expander("👀 Ver tabla de datos proyectados y descargar"):
+    # Mostrar la tabla formateada en la interfaz
     st.dataframe(df.style.format({"Saldo Efectivo": "${:,.2f}"}))
+    
+    # Función interna para convertir el DataFrame a binario Excel
+    def convertir_a_excel(dataframe):
+        output = io.BytesIO()
+        # Usamos openpyxl como motor de escritura
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            dataframe.to_excel(writer, index=False, sheet_name='Proyección de Caja')
+        return output.getvalue()
+
+    # Generar los bytes del archivo Excel
+    excel_data = convertir_a_excel(df)
+
+    # Botón nativo de Streamlit para descargar
+    st.download_button(
+        label="📥 Descargar Proyección en Excel (.xlsx)",
+        data=excel_data,
+        file_name=f"proyeccion_flujo_caja_{datetime.today().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
